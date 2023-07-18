@@ -1,0 +1,32 @@
+server.port: 8080
+
+spring:
+  datasource:
+    username: root
+    password: 376-376
+    url: jdbc:mysql://localhost:3306/search_engine?useSSL=false&requireSSL=false&allowPublicKeyRetrieval=true&serverTimezone=Europe/Moscow
+  jpa:
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQL8Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+
+
+# example values
+indexing-settings:
+  sites:
+    - url: http://www.kais.ru
+      name: Каис.ру
+    - url: https://www.skillbox.ru
+      name: Skillbox
+    - url: https://playback.ru
+      name: PlayBack.Ru
+  userAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36"
+  referrer:  https://google.com
+
+ # Output to a logfile named application.log.
+logging.file.name: application.log
+
