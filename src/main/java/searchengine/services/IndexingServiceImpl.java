@@ -5,7 +5,6 @@ import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingResponse;
-import searchengine.model.PageEntity;
 import searchengine.model.SiteEntity;
 import searchengine.model.Status;
 import searchengine.repository.PageRepository;
@@ -36,57 +35,16 @@ public class IndexingServiceImpl implements IndexingService{
 
     static int pagesCounter;
 
-  //  static private volatile HashSet<String> tmpPassedUrlsList = new HashSet<>(); //uses before save urls to base
-    static private Set<String> tmpPassedUrlsList = ConcurrentHashMap.newKeySet();  //uses before save urls to database
+    static private Set<String> tmpPassedUrlsList = ConcurrentHashMap.newKeySet();  //it's used before saving urls to database
 
-
-    @Override
-    public IndexingResponse singlePageIndexing(Site site) {
-        IndexingResponse response = new IndexingResponse(false);
-
-        if (indexingThreadsStartedCounter > 0) {
-            response.setError("Индексация уже запущена");
-            return response;
-        }
-
-        if (site.getUrl().isEmpty()) {
-            response.setError("Задайте адрес сайта");
-            return response;
-        }
-
-        if (site.getName() == null || site.getName().isEmpty()) {
-            String name = site.getUrl().replace("http://", "");
-            name = name.replace("https://", "");
-            name = name.replace("www", "");
-            site.setName(name);
-        }
-
-
-        tmpPassedUrlsList.clear();
-        stopIndexingRequest = false;
-        pagesCounter = 0;
-        indexingThreadsStartedCounter = 0;
-        referrerValue = sites.getReferrer();
-        userAgentValue = sites.getUserAgent();
-
-        deleteCurrentSiteInfo(site);
-        SiteEntity siteEntity = newSiteRecord(site);
-        Thread thread = new Thread(new Thread(() -> getAllSitePages(siteEntity)));
-
-        thread.setName("site-1");
-        thread.start();
-        indexingThreadsStartedCounter++;
-        response.setResult(true);
-        return response;
-    }
 
 
     @Override
-    public IndexingResponse startIndexing() {
+    public IndexingResponse startIndexing(List<Site> sitesList) {
         IndexingResponse response = new IndexingResponse(false);
 
         if (indexingThreadsStartedCounter > 0) {
-            response.setError("Индексация уже запущена");
+            response.setError("Indexing is already started");
             return response;
         }
 
@@ -95,26 +53,29 @@ public class IndexingServiceImpl implements IndexingService{
         pagesCounter = 0;
         indexingThreadsStartedCounter = 0;
 
-        final List<Site> sitesList = sites.getSites();
+     //   final List<Site> sitesList = sites.getSites();
         referrerValue = sites.getReferrer();
         userAgentValue = sites.getUserAgent();
 
         Thread[] threads = new Thread[sitesList.size()]; //запускаем каждый сайт в отдельном потоке
 
-       // long heapSize = Runtime.getRuntime().totalMemory();
-        //Print the jvm heap size.
-       // System.out.println("Heap Size = " + heapSize);
-
-
         for (int i = 0; i < sitesList.size(); i++) {
              Site site = sitesList.get(i);
+
+            if (site.getUrl().isEmpty()) {
+                response.setError("Set the address of the site");
+                return response;
+            }
+
+
+            urlVarietyControl(site);
+
+
             System.out.println("delete all by site " + site.getName());
              deleteCurrentSiteInfo(site);
 
 
             SiteEntity siteEntity = newSiteRecord(site);
-//             Set<String> linksList = new TreeSet<>(SiteParser.getAllLinks(sitesList.get(i).getUrl())); //"https://skillbox.ru"
-//            new Thread(() -> SiteParser.getAllLinks(site.getUrl()));
             threads[i] = new Thread(new Thread(() -> getAllSitePages(siteEntity)));
 
             threads[i].setName("site-"+i);
@@ -122,24 +83,12 @@ public class IndexingServiceImpl implements IndexingService{
             indexingThreadsStartedCounter++;
         }
 
-        //waiting for threads to finish
-   //     for ( Thread t : threads) {   //!!!!!!! ждет по порядку запуска, т.е. пока не закончится второй - skillbox, не дает результат по короткому 3-ему который уже завершился
-   //         try {
-   //             t.join(); //остановка - ожидание завершения процесса
-  //          } catch (InterruptedException e) {
-  //              throw new RuntimeException(e);
-  //          }
-  //      }
-
-  //      System.out.println("Indexing completed");
-
- //       indexingStarted = false;
         response.setResult(true);
         return response;
     }
 
     private void getAllSitePages(SiteEntity siteEntity) {
-        String siteUrl = siteEntity.getUrl().replace("://www.", "://");
+        String siteUrl = siteEntity.getUrl();
         if (!siteUrl.endsWith("/")) { siteUrl+="/"; } //absUrl
         siteEntity.setDomainName(siteUrl.substring(0,siteUrl.length()-1));
 
@@ -148,13 +97,26 @@ public class IndexingServiceImpl implements IndexingService{
         System.out.println( siteUrl + " - start parsing");
 
         try {
-            new ForkJoinPool(availableCores).invoke(new GetAllLinksFromPage(siteUrl, pageRepository, siteEntity, tmpPassedUrlsList));
+
+            new ForkJoinPool(availableCores).invoke(new GetAllLinksFromPage(siteUrl, siteRepository, pageRepository, siteEntity, tmpPassedUrlsList));
+
+            if (siteEntity.getStatus() != Status.FAILED) {
+                siteEntity.setStatus(Status.INDEXED);
+            }
+            if (stopIndexingRequest == true) {
+                siteEntity.setLastError("Manual stop indexing!");
+            }
 
         } catch (Exception e) {
-            throw new RuntimeException(e);
+           // throw new RuntimeException(e);
+             siteEntity.setStatus(Status.FAILED);
+             siteEntity.setLastError(e.getMessage());
         }
 
+        siteEntity.setStatusTime(LocalDateTime.now());
+        siteRepository.save(siteEntity);
         System.out.println("\n" + siteUrl + " - parsing completed. Lead time(min): " + (System.currentTimeMillis() - startTime) / 60000);
+
         indexingThreadsStartedCounter--;
         if (indexingThreadsStartedCounter <= 0) {
             System.out.println("Indexing completed");
@@ -215,7 +177,25 @@ public class IndexingServiceImpl implements IndexingService{
         }
     }
 
+    private void urlVarietyControl(Site site) {
+        if (site.getUrl().startsWith("www.")) {
+            site.setUrl(site.getUrl().replace("www.", "https://"));
+        }
 
+        if (!site.getUrl().startsWith("http")) {
+            site.setUrl("https://" + site.getUrl());
+        }
+
+        site.setUrl(site.getUrl().replace("://www.", "://"));
+
+        if (site.getName() == null || site.getName().isEmpty()) {
+            String name = site.getUrl().replace("http://", "");
+            name = name.replace("https://", "");
+            name = name.replace("www.", "");
+            site.setName(name);
+        }
+
+    }
 
 
 

@@ -1,14 +1,19 @@
 package searchengine.controllers;
 
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 import searchengine.config.Site;
+import searchengine.config.SitesList;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
+
+import java.util.ArrayList;
+import java.util.List;
 
 @RestController
 @RequestMapping("/api")
@@ -17,9 +22,13 @@ public class ApiController {
     private final StatisticsService statisticsService;
     private final IndexingService indexingService;
 
-    public ApiController(StatisticsService statisticsService, IndexingService indexingService) {
+    private final SitesList sites;
+
+
+    public ApiController(StatisticsService statisticsService, IndexingService indexingService, SitesList sites) {
         this.statisticsService = statisticsService;
         this.indexingService = indexingService;
+        this.sites = sites;
     }
 
     @GetMapping("/statistics")
@@ -29,7 +38,7 @@ public class ApiController {
 
     @GetMapping("/startIndexing")
     public ResponseEntity startIndexing() {
-        return ResponseEntity.ok(indexingService.startIndexing());
+        return ResponseEntity.ok(indexingService.startIndexing(sites.getSites()));
     }
 
 
@@ -40,8 +49,9 @@ public class ApiController {
 
     @PostMapping("/indexPage")
     public ResponseEntity singlePageIndexing(Site site) {
-        System.out.println("single parsing: " + site.getUrl());
-        return ResponseEntity.ok(indexingService.singlePageIndexing(site));
+        List<Site> sitesList = new ArrayList<>();
+        sitesList.add(site);
+        return ResponseEntity.ok(indexingService.startIndexing(sitesList));
     }
 
 

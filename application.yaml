@@ -18,15 +18,17 @@ spring:
 # example values
 indexing-settings:
   sites:
-    - url: http://www.kais.ru
-      name: Каис.ру
-    - url: https://www.skillbox.ru
-      name: Skillbox
-    - url: https://playback.ru
-      name: PlayBack.Ru
+#    - url: https://dombulgakova.ru/
+#      name: dombulgakova.ru
+#    - url: https://radiomv.ru/
+#      name: radiomv.ru
+    - url: https://Skillbox.ru
+      name: Skillbox.Ru
   userAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36"
   referrer:  https://google.com
+  currentTimeZone: Europe/Moscow
 
  # Output to a logfile named application.log.
 logging.file.name: application.log
+
 
