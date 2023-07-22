@@ -73,11 +73,11 @@ public class GetAllLinksFromPage extends RecursiveAction {
                 } catch (Exception e) {
                     log.info("Can't get page:" + pageUrl);
                     log.info(e.getMessage());
-      //              if (pageUrl == siteEntity.getUrl()) {
-                        siteEntity.setLastError(e.getMessage());
+                    if (pageUrl == siteEntity.getUrl()) {
                         siteEntity.setStatus(Status.FAILED);
-                        siteRepository.save(siteEntity);
-       //             }
+                    }
+                    siteEntity.setLastError(e.getMessage());
+                    siteRepository.save(siteEntity);
                     return;
                 }
 
@@ -113,7 +113,7 @@ public class GetAllLinksFromPage extends RecursiveAction {
 
                           if (tmpPassedUrlsList.add(pageUrlForSave) && !pageRepository.findFirstByPathAndSite_id(pageUrlForSave, siteEntity.getId()).isPresent()) {
                               try {
-                                  Thread.sleep(150);
+                                  Thread.sleep(200);
 
                               } catch (InterruptedException e) {
                                   throw new RuntimeException(e);

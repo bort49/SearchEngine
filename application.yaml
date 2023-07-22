@@ -22,10 +22,10 @@ indexing-settings:
 #      name: dombulgakova.ru
 #    - url: https://radiomv.ru/
 #      name: radiomv.ru
-    - url: https://Skillbox.ru
-      name: Skillbox.Ru
+    - url: http://www.playback.ru/
+      name: playback.ru
   userAgent: "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/37.0.2049.0 Safari/537.36"
-  referrer:  https://google.com
+  referrer: https://www.google.com
   currentTimeZone: Europe/Moscow
 
  # Output to a logfile named application.log.

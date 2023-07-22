@@ -38,6 +38,10 @@ public class SiteEntity {
     @OneToMany(mappedBy = "site", cascade = CascadeType.REMOVE) //, cascade = CascadeType.ALL - глючит когда много данных //cascade All приведет к тому, что при сайта удалятся его страницы
     private Set<PageEntity> pageSet;
 
+    @OneToMany(mappedBy = "site", cascade = CascadeType.REMOVE) //, cascade = CascadeType.ALL - глючит когда много данных //cascade All приведет к тому, что при сайта удалятся его страницы
+    private Set<LemmaEntity> lemmaSet;
+
+
     @Transient
     private String domainName;
 

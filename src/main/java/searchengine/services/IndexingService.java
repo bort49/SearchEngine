@@ -6,7 +6,9 @@ import searchengine.dto.indexing.IndexingResponse;
 import java.util.List;
 
 public interface IndexingService {
-    IndexingResponse startIndexing(List<Site> sitesList);
+    IndexingResponse startIndexing();
+
+    IndexingResponse pageIndexing(String url);
 
     IndexingResponse stopIndexing();
 

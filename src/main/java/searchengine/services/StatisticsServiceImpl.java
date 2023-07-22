@@ -40,9 +40,6 @@ public class StatisticsServiceImpl implements StatisticsService {
 //        };
 
         TotalStatistics total = new TotalStatistics();
-        total.setSites(sites.getSites().size());
-        total.setIndexing(true);
-
         List<DetailedStatisticsItem> detailed = new ArrayList<>();
 
         Iterable<SiteEntity> siteIterable = siteRepository.findAll();
@@ -50,6 +47,10 @@ public class StatisticsServiceImpl implements StatisticsService {
         for (SiteEntity site: siteIterable) {
             sitesList.add(site);
         }
+
+
+        total.setSites(sitesList.size());
+        total.setIndexing((IndexingServiceImpl.indexingThreadsStartedCounter > 0) ? true : false);
 
         for (int i = 0; i < sitesList.size(); i++) {
              SiteEntity site = sitesList.get(i);

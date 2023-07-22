@@ -38,7 +38,8 @@ public class ApiController {
 
     @GetMapping("/startIndexing")
     public ResponseEntity startIndexing() {
-        return ResponseEntity.ok(indexingService.startIndexing(sites.getSites()));
+
+        return ResponseEntity.ok(indexingService.startIndexing());
     }
 
 
@@ -48,10 +49,12 @@ public class ApiController {
     }
 
     @PostMapping("/indexPage")
-    public ResponseEntity singlePageIndexing(Site site) {
-        List<Site> sitesList = new ArrayList<>();
-        sitesList.add(site);
-        return ResponseEntity.ok(indexingService.startIndexing(sitesList));
+    public ResponseEntity singlePageIndexing(String url) {
+//        List<Site> sitesList = new ArrayList<>();
+//        sitesList.add(site);
+        System.out.println(url);
+
+        return ResponseEntity.ok(indexingService.pageIndexing(url));
     }
 
 

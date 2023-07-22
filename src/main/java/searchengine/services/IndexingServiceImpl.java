@@ -38,9 +38,38 @@ public class IndexingServiceImpl implements IndexingService{
     static private Set<String> tmpPassedUrlsList = ConcurrentHashMap.newKeySet();  //it's used before saving urls to database
 
 
+    @Override
+    public IndexingResponse pageIndexing(String url) {
+        IndexingResponse response = new IndexingResponse(false);
+
+        url = urlVarietyControl(url);
+        final List<Site> sitesList = sites.getSites();
+        for (int i = 0; i < sitesList.size(); i++) {
+            Site site = sitesList.get(i);
+
+            if (url.startsWith(site.getUrl())) {
+                // TODO: 23.07.2023
+                // indexing single page and replace current data on page in database
+
+
+
+                continue;
+            }
+            else {
+                response.setError("This page is outside the sites specified in the configuration file");
+                return response;
+
+            }
+
+        }
+
+
+        response.setResult(true);
+        return response;
+    }
 
     @Override
-    public IndexingResponse startIndexing(List<Site> sitesList) {
+    public IndexingResponse startIndexing() {
         IndexingResponse response = new IndexingResponse(false);
 
         if (indexingThreadsStartedCounter > 0) {
@@ -53,7 +82,7 @@ public class IndexingServiceImpl implements IndexingService{
         pagesCounter = 0;
         indexingThreadsStartedCounter = 0;
 
-     //   final List<Site> sitesList = sites.getSites();
+        final List<Site> sitesList = sites.getSites();
         referrerValue = sites.getReferrer();
         userAgentValue = sites.getUserAgent();
 
@@ -68,8 +97,10 @@ public class IndexingServiceImpl implements IndexingService{
             }
 
 
-            urlVarietyControl(site);
-
+            site.setUrl(urlVarietyControl(site.getUrl()));
+            if (site.getName().isEmpty() || site.getName() == null) {
+                site.setName(createSiteNameByUrl(site.getUrl()));
+            }
 
             System.out.println("delete all by site " + site.getName());
              deleteCurrentSiteInfo(site);
@@ -177,7 +208,7 @@ public class IndexingServiceImpl implements IndexingService{
         }
     }
 
-    private void urlVarietyControl(Site site) {
+ /*   private void urlVarietyControl(Site site) {
         if (site.getUrl().startsWith("www.")) {
             site.setUrl(site.getUrl().replace("www.", "https://"));
         }
@@ -196,6 +227,25 @@ public class IndexingServiceImpl implements IndexingService{
         }
 
     }
+*/
+ private String urlVarietyControl(String url) {
+     if (url.startsWith("www.")) {
+        url.replace("www.", "https://");
+     }
+
+     if (!url.startsWith("http")) {
+         url = "https://" + url;
+     }
+
+     return url.replace("://www.", "://");
+     }
+
+ private String createSiteNameByUrl(String url) {
+         String name = url.replace("http://", "");
+         name = name.replace("https://", "");
+         name = name.replace("www.", "");
+         return name;
+ }
 
 
 

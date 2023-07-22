@@ -4,6 +4,8 @@ import lombok.Getter;
 import lombok.Setter;
 
 import javax.persistence.*;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name    = "page")
@@ -25,8 +27,14 @@ public class PageEntity {
     private String content;
 
     @ManyToOne(fetch = FetchType.LAZY) //cascade = CascadeType.ALL, !!!! cascade All приведет к тому, что при удалении страницы удалится сайт, а это нам не надо
-  //  @MapsId("id")
     @JoinColumn(name = "site_id", foreignKey = @ForeignKey(name = "site_id_key"))
     private SiteEntity site;
+
+    @OneToMany(mappedBy = "page", cascade = CascadeType.REMOVE)
+    private List<IndexEntity> index = new ArrayList<>();
+
+
+
+
 
 }
