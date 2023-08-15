@@ -7,7 +7,10 @@ import lombok.Setter;
 import javax.persistence.*;
 import javax.persistence.Index;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Entity
 @Table(name = "site"
@@ -44,5 +47,11 @@ public class SiteEntity {
 
     @Transient
     private String domainName;
+
+    @Transient
+    public ConcurrentHashMap<String, LemmaEntity> siteLemmaSet = new ConcurrentHashMap<>();
+    @Transient
+    public ArrayList<IndexEntity> siteIndexSet = new ArrayList<>();
+
 
 }

@@ -5,8 +5,9 @@ import org.springframework.stereotype.Service;
 import searchengine.config.Site;
 import searchengine.config.SitesList;
 import searchengine.dto.indexing.IndexingResponse;
-import searchengine.model.SiteEntity;
-import searchengine.model.Status;
+import searchengine.model.*;
+import searchengine.repository.IndexRepository;
+import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
@@ -23,11 +24,17 @@ import static java.lang.Thread.sleep;
 @RequiredArgsConstructor // создает конструктор с аргументами, соответствующими неинициализированным final-полям класса.
 public class IndexingServiceImpl implements IndexingService{
 
+    private static final int PARTIAL_COUNT_FOR_SAVE_RECORDS = 50_000;
+
     public static boolean stopIndexingRequest;
     static int indexingThreadsStartedCounter = 0;
     private final SitesList sites;
     private final PageRepository pageRepository;
     private final SiteRepository siteRepository;
+
+    private final LemmaRepository lemmaRepository;
+
+    private final IndexRepository indexRepository;
     public static String userAgentValue;
     public static String referrerValue;
 
@@ -37,25 +44,54 @@ public class IndexingServiceImpl implements IndexingService{
 
     static private Set<String> tmpPassedUrlsList = ConcurrentHashMap.newKeySet();  //it's used before saving urls to database
 
+//    static private ConcurrentHashMap<String, Integer> tmpSiteLemmaList = new ConcurrentHashMap<>();
+//    ArrayList<ConcurrentHashMap> tmpSitesLemmaList;
+
 
     @Override
     public IndexingResponse pageIndexing(String url) {
         IndexingResponse response = new IndexingResponse(false);
 
         url = urlVarietyControl(url);
+
+
+        referrerValue = sites.getReferrer();
+        userAgentValue = sites.getUserAgent();
         final List<Site> sitesList = sites.getSites();
         for (int i = 0; i < sitesList.size(); i++) {
             Site site = sitesList.get(i);
+            site.setUrl(urlVarietyControl(site.getUrl()));
+
 
             if (url.startsWith(site.getUrl())) {
-                // TODO: 23.07.2023
-                // indexing single page and replace current data on page in database
+
+                SiteEntity siteEntity = siteRepository.findByUrl(site.getUrl());
+                if (siteEntity == null) {
+                    newSiteRecord(site);
+                }
+
+                siteEntity.setDomainName(site.getUrl().substring(0,site.getUrl().length()-1));
+
+                String pageUrlForSave =  url.substring(siteEntity.getDomainName().length());
+
+                Optional<PageEntity> optionalPageEntity = pageRepository.findFirstByPathAndSite_id(pageUrlForSave, siteEntity.getId());
+                if (optionalPageEntity.isPresent()) {
+                    PageEntity page = optionalPageEntity.get();
+                    pageRepository.delete(page);
+                    System.out.println("deleted current record from page table");
+                }
+
+
+              //  SiteEntity finalSiteEntity = siteEntity;
+        //        new PageParseAndIndexing(url, true, siteRepository, pageRepository, siteEntity, tmpPassedUrlsList);
+                new ForkJoinPool(availableCores).invoke(new PageParseAndIndexing(url, true, siteRepository, pageRepository, lemmaRepository, indexRepository, siteEntity, tmpPassedUrlsList));
 
 
 
-                continue;
+                break;
             }
-            else {
+
+            if (i == sitesList.size()-1) {
                 response.setError("This page is outside the sites specified in the configuration file");
                 return response;
 
@@ -87,6 +123,7 @@ public class IndexingServiceImpl implements IndexingService{
         userAgentValue = sites.getUserAgent();
 
         Thread[] threads = new Thread[sitesList.size()]; //запускаем каждый сайт в отдельном потоке
+        List<ConcurrentHashMap<String, Integer>> tmpSitesLemmaSet = new ArrayList<ConcurrentHashMap<String, Integer>>();
 
         for (int i = 0; i < sitesList.size(); i++) {
              Site site = sitesList.get(i);
@@ -102,12 +139,13 @@ public class IndexingServiceImpl implements IndexingService{
                 site.setName(createSiteNameByUrl(site.getUrl()));
             }
 
-            System.out.println("delete all by site " + site.getName());
-             deleteCurrentSiteInfo(site);
+            System.out.println("delete all data by site " + site.getName());
+            deleteCurrentSiteInfo(site);
 
 
             SiteEntity siteEntity = newSiteRecord(site);
-            threads[i] = new Thread(new Thread(() -> getAllSitePages(siteEntity)));
+//            ConcurrentHashMap<String, Integer> tmpSiteLemmaSet = new ConcurrentHashMap<>();
+            threads[i] = new Thread(new Thread(() -> siteIndexing(siteEntity)));
 
             threads[i].setName("site-"+i);
             threads[i].start();
@@ -118,24 +156,24 @@ public class IndexingServiceImpl implements IndexingService{
         return response;
     }
 
-    private void getAllSitePages(SiteEntity siteEntity) {
+    private void siteIndexing(SiteEntity siteEntity) {
         String siteUrl = siteEntity.getUrl();
         if (!siteUrl.endsWith("/")) { siteUrl+="/"; } //absUrl
         siteEntity.setDomainName(siteUrl.substring(0,siteUrl.length()-1));
 
 
         long startTime = System.currentTimeMillis();
-        System.out.println( siteUrl + " - start parsing");
+        System.out.println("\n" + siteUrl + " - start parsing");
 
         try {
 
-            new ForkJoinPool(availableCores).invoke(new GetAllLinksFromPage(siteUrl, siteRepository, pageRepository, siteEntity, tmpPassedUrlsList));
+            new ForkJoinPool(availableCores).invoke(new PageParseAndIndexing(siteUrl, false, siteRepository, pageRepository, lemmaRepository, indexRepository, siteEntity, tmpPassedUrlsList));
 
             if (siteEntity.getStatus() != Status.FAILED) {
                 siteEntity.setStatus(Status.INDEXED);
             }
             if (stopIndexingRequest == true) {
-                siteEntity.setLastError("Manual stop indexing!");
+                siteEntity.setLastError("\nManual stop indexing!");
             }
 
         } catch (Exception e) {
@@ -144,15 +182,77 @@ public class IndexingServiceImpl implements IndexingService{
              siteEntity.setLastError(e.getMessage());
         }
 
+
+        saveLemmaAndIndexesSetsBySite(siteEntity);
+
+
+
         siteEntity.setStatusTime(LocalDateTime.now());
         siteRepository.save(siteEntity);
         System.out.println("\n" + siteUrl + " - parsing completed. Lead time(min): " + (System.currentTimeMillis() - startTime) / 60000);
 
         indexingThreadsStartedCounter--;
         if (indexingThreadsStartedCounter <= 0) {
-            System.out.println("Indexing completed");
+            System.out.println("\nIndexing completed");
         }
     }
+
+
+
+    private void saveLemmaAndIndexesSetsBySite(SiteEntity siteEntity){
+  /*
+        System.out.println("\nSave Lemma set by " + siteEntity.getUrl());
+        ArrayList<LemmaEntity> siteLemmaEntityList = new ArrayList<>(siteEntity.siteLemmaSet.values());
+        lemmaRepository.saveAll(siteLemmaEntityList);
+        //lemmaRepository.flush();
+        System.out.println("\nlemmas by site " + siteEntity.getUrl() + " saved");
+
+
+        System.out.println("\nSave indexes set by " + siteEntity.getUrl());
+        System.out.println("Records count for save: " + siteEntity.siteIndexSet.size());
+        indexRepository.saveAll(siteEntity.siteIndexSet);
+        //indexRepository.flush();
+
+        System.out.println("\nAll indexes by site " + siteEntity.getUrl() + " saved");
+*/
+
+        //for big data
+        System.out.println("\nSave Lemma set by " + siteEntity.getUrl());
+        ArrayList<LemmaEntity> siteLemmaEntityList = new ArrayList<>(siteEntity.siteLemmaSet.values());
+        List<List<LemmaEntity>> partitionsForSaveLemmas = new ArrayList<>();
+
+        for (int i = 0; i < siteLemmaEntityList.size(); i+=PARTIAL_COUNT_FOR_SAVE_RECORDS) {
+            partitionsForSaveLemmas.add(siteLemmaEntityList.subList(i, Math.min(i + PARTIAL_COUNT_FOR_SAVE_RECORDS, siteLemmaEntityList.size())));
+        }
+
+        for (List<LemmaEntity> portion: partitionsForSaveLemmas) {
+            lemmaRepository.saveAllAndFlush(portion);
+        }
+
+        partitionsForSaveLemmas.clear();
+        System.out.println("\nlemmas by site " + siteEntity.getUrl() + " saved");
+
+
+        System.out.println("\nSave indexes set by " + siteEntity.getUrl());
+        System.out.println("Records count for save: " + siteEntity.siteIndexSet.size());
+        List<List<IndexEntity>> partitionsForSaveIndexes = new ArrayList<>();
+
+        for (int i = 0; i < siteEntity.siteIndexSet.size(); i+=PARTIAL_COUNT_FOR_SAVE_RECORDS) {
+            partitionsForSaveIndexes.add(siteEntity.siteIndexSet.subList(i, Math.min(i + PARTIAL_COUNT_FOR_SAVE_RECORDS, siteEntity.siteIndexSet.size())));
+        }
+
+        for (List<IndexEntity> portion: partitionsForSaveIndexes) {
+            indexRepository.saveAll(portion);
+            System.out.println("partially saved:  " + indexRepository.count() + " records in Index. " + LocalDateTime.now());
+        }
+
+     //indexRepository.flush();
+
+        partitionsForSaveIndexes.clear();
+        System.out.println("\nAll indexes by site " + siteEntity.getUrl() + " saved");
+
+    }
+
 
 
     @Override

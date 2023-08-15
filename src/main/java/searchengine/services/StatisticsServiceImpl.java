@@ -9,6 +9,7 @@ import searchengine.dto.statistics.StatisticsData;
 import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.dto.statistics.TotalStatistics;
 import searchengine.model.SiteEntity;
+import searchengine.repository.LemmaRepository;
 import searchengine.repository.PageRepository;
 import searchengine.repository.SiteRepository;
 
@@ -27,6 +28,7 @@ public class StatisticsServiceImpl implements StatisticsService {
     private final SitesList sites;
     private final PageRepository pageRepository;
     private final SiteRepository siteRepository;
+    private final LemmaRepository lemmaRepository;
 
 
 
@@ -60,8 +62,7 @@ public class StatisticsServiceImpl implements StatisticsService {
 
 
              int pages = pageRepository.countBySite_id(site.getId());
-            // TODO: 05.07.2023 заменить на реальные значения
-             int lemmas = 0;
+             int lemmas = lemmaRepository.countBySite_id(site.getId());
              item.setPages(pages);
              item.setLemmas(lemmas);
 

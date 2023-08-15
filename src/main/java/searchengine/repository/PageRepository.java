@@ -1,5 +1,6 @@
 package searchengine.repository;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
@@ -20,4 +21,6 @@ public interface PageRepository extends JpaRepository<PageEntity, Integer> {
      void deleteAllBySite_id(@Param("site_id") int site_id);
 
      int countBySite_id(@Param("site_id") int site_id);
+
+
 }

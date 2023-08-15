@@ -1,6 +1,8 @@
 package searchengine.controllers;
 
 
+import org.apache.lucene.morphology.LuceneMorphology;
+import org.apache.lucene.morphology.russian.RussianLuceneMorphology;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -12,6 +14,7 @@ import searchengine.dto.statistics.StatisticsResponse;
 import searchengine.services.IndexingService;
 import searchengine.services.StatisticsService;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -38,7 +41,6 @@ public class ApiController {
 
     @GetMapping("/startIndexing")
     public ResponseEntity startIndexing() {
-
         return ResponseEntity.ok(indexingService.startIndexing());
     }
 
@@ -52,7 +54,8 @@ public class ApiController {
     public ResponseEntity singlePageIndexing(String url) {
 //        List<Site> sitesList = new ArrayList<>();
 //        sitesList.add(site);
-        System.out.println(url);
+        System.out.println("single page indexing: " + url);
+
 
         return ResponseEntity.ok(indexingService.pageIndexing(url));
     }
